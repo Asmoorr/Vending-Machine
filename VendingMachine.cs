@@ -79,9 +79,9 @@
             if (inserted < targetProduct.PriceCents)
                 return (
                     false,
-                    $"Недостаточно средств. Нужно" +
-                    $"{Utils.FormatMoney(targetProduct.PriceCents)}," +
-                    $"внесено {Utils.FormatMoney(inserted)}.",
+                    $"Недостаточно средств. Нужно " +
+                    $"{Utils.FormatMoney(targetProduct.PriceCents)}, а " +
+                    $"внесено {Utils.FormatMoney(inserted)}",
                     null
                 );
 
@@ -92,29 +92,27 @@
                 pool[kv.Key] = pool.GetValueOrDefault(kv.Key, 0) + kv.Value;
 
             var change = MakeChange(changeNeeded, pool);
-            if (change == null)
+            if (change == null) // Can't make change because not enough coins in the machine
             {
-                // Не можем выдать точную сдачу — отклоняем покупку
                 return (false, "Невозможно выдать точную сдачу. Операция отменена.", null);
             }
 
-            // Успешная покупка:
-            // 1) уменьшить количество товара
-            var idx = _products.FindIndex(p => p.Id == productId);
+            // Successful purchase
+            var idx = _products.FindIndex(product => product.Id == productId);
             _products[idx] = targetProduct with { Quantity = targetProduct.Quantity - 1 };
 
-            // 2) вставленные монеты добавляются в машину
+            // Insert coins into the machine
             foreach (var kv in _insertedCoins)
                 _machineCoins[kv.Key] = _machineCoins.GetValueOrDefault(kv.Key, 0) + kv.Value;
 
-            // 3) выдать сдачу: уменьшить соответствующие монеты в машине
+            // Return change
             foreach (var kv in change)
                 _machineCoins[kv.Key] = _machineCoins.GetValueOrDefault(kv.Key, 0) - kv.Value;
 
-            // 4) увеличить собранные средства на цену товара
+            // Add product price to collected cents
             _collectedCents += targetProduct.PriceCents;
 
-            // 5) очистить insertedCoins
+            // Clear inserted coins
             foreach (var k in CoinDenominations.Denominations)
                 _insertedCoins[k] = 0;
 

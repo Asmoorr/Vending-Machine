@@ -8,8 +8,8 @@
         {
             var products = new List<Product>
             {
-                new Product(1, "Чипсы", 150, 5),
-                new Product(2, "Шоколад", 120, 5),
+                new Product(1, "Чипсы", 150, 2),
+                new Product(2, "Шоколад", 120, 1),
                 new Product(3, "Вода", 90, 5)
             };
 
@@ -29,23 +29,33 @@
 
         private static void RunMainLoop(VendingMachine machine)
         {
+            Console.Clear();
             while (true)
             {
-                Console.WriteLine("\nКто пришёл? (customer/admin/exit)");
+                Console.WriteLine("\nКто пришёл?");
+                Console.WriteLine("1. Customer");
+                Console.WriteLine("2. Admin");
+                Console.WriteLine("3. Exit");
                 Console.Write("Выбор: ");
                 var user = (Console.ReadLine() ?? string.Empty).Trim().ToLowerInvariant();
 
-                if (user == "exit")
+                if (user == "3" || user.Equals("exit", StringComparison.CurrentCultureIgnoreCase))
                     break;
 
-                switch (user)
+                Console.Clear();
+
+                switch (user.ToLower())
                 {
-                    case "admin":
-                        HandleAdminRole(machine);
-                        break;
-                    case "customer":
+                    case "1":
+                    case "customer": // Customer
                         HandleCustomerRole(machine);
                         break;
+
+                    case "2":
+                    case "admin": // Admin
+                        HandleAdminRole(machine);
+                        break;
+
                     default:
                         Console.WriteLine("Неверный выбор роли.");
                         break;
@@ -68,12 +78,14 @@
             {
                 PrintAdminMenu();
                 Console.Write("Выбор: ");
-                var action = Console.ReadLine() ?? string.Empty;
+                var adminAction = Console.ReadLine() ?? string.Empty;
 
-                if (action == "0")
+                Console.Clear();
+
+                if (adminAction == "0")
                     break;
 
-                switch (action)
+                switch (adminAction)
                 {
                     case "1":
                         AdminCollectEarnings(machine);
@@ -115,9 +127,9 @@
             Console.Write("Название товара: ");
             var name = Console.ReadLine() ?? string.Empty;
 
-            Console.Write("Цена (В формате: 'rubles.pennies'): ");
+            Console.Write("Цена (В формате: 'rub.penny'): ");
             var priceStr = Console.ReadLine() ?? string.Empty;
-            if (!Utils.TryParseMoneyToCents(priceStr, out var priceCents))
+            if (!Utils.TryParseMoneyToCents(priceStr, out var priceCents) || priceCents <= 0)
             {
                 Console.WriteLine("Неверная цена.");
                 return;
@@ -136,6 +148,7 @@
 
         private static void AdminRemoveProduct(VendingMachine machine)
         {
+            ViewProducts(machine);
             Console.Write("Название товара для удаления: ");
             var productName = Console.ReadLine() ?? string.Empty;
             Console.WriteLine(machine.RemoveProductByName(productName)
@@ -158,15 +171,17 @@
             {
                 PrintCustomerMenu(machine);
                 Console.Write("Выбор: ");
-                var c = Console.ReadLine() ?? string.Empty;
+                var customerAction = Console.ReadLine() ?? string.Empty;
 
-                if (c == "0")
+                Console.Clear();
+
+                if (customerAction == "0")
                     break;
 
-                switch (c)
+                switch (customerAction)
                 {
                     case "1":
-                        CustomerViewProducts(machine);
+                        ViewProducts(machine);
                         break;
                     case "2":
                         CustomerInsertCoin(machine);
@@ -195,7 +210,7 @@
             Console.WriteLine($"Внесено: {Utils.FormatMoney(machine.InsertedAmountCents)}");
         }
 
-        private static void CustomerViewProducts(VendingMachine machine)
+        private static void ViewProducts(VendingMachine machine)
         {
             Utils.PrintProducts(machine.ListProducts());
         }
@@ -210,6 +225,7 @@
                 Console.WriteLine("Неверный ввод.");
                 return;
             }
+
             Console.Write("Введите количество монет (например 1): ");
             var userAmount = Console.ReadLine() ?? string.Empty;
             if (!int.TryParse(userAmount, out var amount))
@@ -217,6 +233,7 @@
                 Console.WriteLine("Неверный ввод.");
                 return;
             }
+
             try
             {
                 machine.InsertCoin(coin, amount);
@@ -224,14 +241,15 @@
             }
             catch (Exception ex)
             {
-                Console.WriteLine("Ошибка: " + ex.Message);
+                Console.WriteLine($"Ошибка: {ex.Message}");
             }
         }
 
         private static void CustomerSelectProduct(VendingMachine machine)
         {
+            ViewProducts(machine);
             Console.Write("Введите ID товара: ");
-            if (!int.TryParse(Console.ReadLine(), out int id))
+            if (!int.TryParse(Console.ReadLine(), out var id))
             {
                 Console.WriteLine("Неверный ID.");
                 return;
@@ -239,17 +257,15 @@
 
             var (success, msg, change) = machine.BuyProduct(id);
             Console.WriteLine(msg);
-            if (success && change != null)
+            if (!success || change == null) return;
+            if (change.Count > 0)
             {
-                if (change.Count > 0)
-                {
-                    Console.WriteLine("Сдача:");
-                    Utils.PrintCoins(change);
-                }
-                else
-                {
-                    Console.WriteLine("Сдача: 0");
-                }
+                Console.WriteLine("Сдача:");
+                Utils.PrintCoins(change);
+            }
+            else
+            {
+                Console.WriteLine("Сдача: 0");
             }
         }
 
