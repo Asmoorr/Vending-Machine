@@ -3,7 +3,7 @@ using VendingMachine.Models;
 
 namespace VendingMachine;
 
-class Program
+internal static class Program
 {
     private const string AdminPassword = "pass";
 

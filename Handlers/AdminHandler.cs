@@ -30,8 +30,6 @@ public class AdminHandler(VendingMachine machine) : IRoleHandler
 
             Console.Clear();
 
-            if (action == AdminAction.Exit) break;
-
             switch (action)
             {
                 case AdminAction.CollectEarnings:
@@ -46,6 +44,13 @@ public class AdminHandler(VendingMachine machine) : IRoleHandler
                 case AdminAction.ShowProducts:
                     AdminShowProducts(machine);
                     break;
+                case AdminAction.AddCoins:
+                    AdminAddCoins(machine);
+                    break;
+                case AdminAction.Exit:
+                    return;
+                default:
+                    throw new ArgumentOutOfRangeException();
             }
         }
     }
@@ -55,21 +60,49 @@ public class AdminHandler(VendingMachine machine) : IRoleHandler
         Console.WriteLine("\n--- ADMIN MENU ---");
         Console.WriteLine("1. Забрать деньги");
         Console.WriteLine("2. Добавить товар");
-        Console.WriteLine("3. Удалить товар по названию");
-        Console.WriteLine("4. Показать товары");
+        Console.WriteLine("3. Добавить монеты");
+        Console.WriteLine("4. Удалить товар по названию");
+        Console.WriteLine("5. Показать товары и количество монет в автомате");
         Console.WriteLine("0. Выйти в главное меню");
     }
 
     private static void AdminCollectEarnings(VendingMachine machine)
     {
-        var cents = machine.CollectEarnings();
-        Console.WriteLine($"Забрали {Utils.FormatMoney(cents)}");
+        Console.WriteLine("1. Забрать заработанные деньги");
+        Console.WriteLine("2. Забрать все деньги");
+        Console.WriteLine("0. Выйти в главное меню");
+        Console.Write("Выбор: ");
+        var input = Console.ReadLine() ?? string.Empty;
+        Enum.TryParse<AdminCollectAction>(input.Trim(), ignoreCase: true, out var action);
+        switch (action)
+        {
+            case AdminCollectAction.CollectEarnings:
+                var collectedMoney = machine.CollectEarnings();
+                Console.WriteLine($"Забрали {Utils.FormatMoney(collectedMoney)}");
+                break;
+            case AdminCollectAction.CollectAllMoney:
+                collectedMoney = machine.CollectInnerMoney() + machine.CollectEarnings();
+                Console.WriteLine($"Забрали {Utils.FormatMoney(collectedMoney)}");
+                break;
+            case AdminCollectAction.Exit:
+                return;
+            default:
+                Console.WriteLine("Неверный выбор.");
+                break;
+        }
     }
 
     private static void AdminAddProduct(VendingMachine machine)
     {
         Console.Write("Название товара: ");
         var name = Console.ReadLine() ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            Console.WriteLine("Название товара не может быть пустым.");
+            return;
+        }
+
+        name = name.Trim();
 
         Console.Write("Цена (В формате: 'rub.penny'): ");
         var priceStr = Console.ReadLine() ?? string.Empty;
@@ -103,8 +136,36 @@ public class AdminHandler(VendingMachine machine) : IRoleHandler
     private static void AdminShowProducts(VendingMachine machine)
     {
         Utils.PrintProducts(machine.ListProducts());
-        Console.WriteLine($"Собрано: {Utils.FormatMoney(machine.GetCollectedCents())}");
+        Console.WriteLine($"Выручка: {Utils.FormatMoney(machine.GetCollectedCents())}");
         Console.WriteLine("Монеты в автомате:");
         Utils.PrintCoins(machine.GetMachineCoins());
+    }
+
+    private static void AdminAddCoins(VendingMachine machine)
+    {
+        var denominations = CoinDenominations.Denominations;
+        Console.Write($"Номинал монеты (один из: {string.Join(", ", denominations)}): ");
+        var denomination = Convert.ToInt32(Console.ReadLine() ?? string.Empty);
+        if (denomination <= 0 || !denominations.Contains(denomination))
+        {
+            Console.WriteLine("Неверный номинал монеты.");
+            return;
+        }
+
+        Console.Write("Количество: ");
+        if (!int.TryParse(Console.ReadLine(), out var quantity) || quantity <= 0)
+        {
+            Console.WriteLine("Неверное количество.");
+            return;
+        }
+
+        var isAdded = machine.AddCoins(denomination, quantity);
+        if (!isAdded)
+        {
+            Console.WriteLine($"Невозможно добавить {quantity} монет с номиналом {denomination}.");
+            return;
+        }
+
+        Console.WriteLine($"Добавлено {quantity} монет с номиналом {denomination}");
     }
 }

@@ -6,36 +6,49 @@ public class CustomerHandler(VendingMachine machine) : IRoleHandler
 {
     public void Handle()
     {
-        PrintCustomerMenu(machine);
-        Console.Write("Выбор: ");
-        var input = Console.ReadLine() ?? string.Empty;
-
-        if (!Enum.TryParse<CustomerAction>(input.Trim(), ignoreCase: true, out var action) ||
-            !Enum.IsDefined(typeof(CustomerAction), action))
+        while (true)
         {
+            PrintCustomerMenu(machine);
+            if (machine.IsEmptyMachineCoins())
+            {
+                Console.WriteLine(
+                    "ПРЕДУПРЕЖДЕНИЕ: " +
+                    "В автомате нет монет. Любые операции требующие сдачи будут отменены. Дождитесь добавления монет."
+                );
+            }
+
+            Console.Write("Выбор: ");
+            var input = Console.ReadLine() ?? string.Empty;
+
+            if (!Enum.TryParse<CustomerAction>(input.Trim(), ignoreCase: true, out var action) ||
+                !Enum.IsDefined(typeof(CustomerAction), action))
+            {
+                Console.Clear();
+                Console.WriteLine("Неверный выбор.");
+                return;
+            }
+
             Console.Clear();
-            Console.WriteLine("Неверный выбор.");
-            return;
-        }
 
-        Console.Clear();
-
-        if (action == CustomerAction.Exit) return;
-
-        switch (action)
-        {
-            case CustomerAction.ViewProducts:
-                Utils.ViewProducts(machine);
-                break;
-            case CustomerAction.InsertCoin:
-                CustomerInsertCoin(machine);
-                break;
-            case CustomerAction.SelectProduct:
-                CustomerSelectProduct(machine);
-                break;
-            case CustomerAction.CancelAndReturn:
-                CustomerCancelAndReturn(machine);
-                break;
+            switch (action)
+            {
+                case CustomerAction.ViewProducts:
+                    Utils.ViewProducts(machine);
+                    break;
+                case CustomerAction.InsertCoin:
+                    CustomerInsertCoin(machine);
+                    break;
+                case CustomerAction.SelectProduct:
+                    CustomerSelectProduct(machine);
+                    break;
+                case CustomerAction.CancelAndReturn:
+                    CustomerCancelAndReturn(machine);
+                    break;
+                case CustomerAction.Exit:
+                    return;
+                default:
+                    throw new ArgumentOutOfRangeException();
+            }
         }
     }
 
@@ -52,10 +65,11 @@ public class CustomerHandler(VendingMachine machine) : IRoleHandler
 
     private static void CustomerInsertCoin(VendingMachine machine)
     {
-        Console.WriteLine("Доступные номиналы (в копейках): " + string.Join(", ", CoinDenominations.Denominations));
-        Console.Write("Введите номинал (например 100): ");
+        Console.WriteLine($"Доступные номиналы (в копейках): {string.Join(", ", CoinDenominations.Denominations)}");
         var userDenomination = Console.ReadLine() ?? string.Empty;
-        if (!int.TryParse(userDenomination, out var coin))
+        if (!int.TryParse(userDenomination, out var coin) ||
+            coin <= 0 ||
+            !CoinDenominations.Denominations.Contains(coin))
         {
             Console.WriteLine("Неверный ввод.");
             return;
@@ -63,7 +77,7 @@ public class CustomerHandler(VendingMachine machine) : IRoleHandler
 
         Console.Write("Введите количество монет (например 1): ");
         var userAmount = Console.ReadLine() ?? string.Empty;
-        if (!int.TryParse(userAmount, out var amount))
+        if (!int.TryParse(userAmount, out var amount) || amount <= 0)
         {
             Console.WriteLine("Неверный ввод.");
             return;
@@ -72,7 +86,8 @@ public class CustomerHandler(VendingMachine machine) : IRoleHandler
         try
         {
             machine.InsertCoin(coin, amount);
-            Console.WriteLine($"Вставлено: {Utils.FormatMoney(machine.InsertedAmountCents)}");
+            Console.WriteLine($"Вставлено: {Utils.FormatMoney(coin * amount)}");
+            Console.WriteLine($"Сумма в автомате: {Utils.FormatMoney(machine.InsertedAmountCents)}");
         }
         catch (Exception ex)
         {
@@ -84,19 +99,20 @@ public class CustomerHandler(VendingMachine machine) : IRoleHandler
     {
         Utils.ViewProducts(machine);
         Console.Write("Введите ID товара: ");
-        if (!int.TryParse(Console.ReadLine(), out var id))
+        var idStr = Console.ReadLine() ?? string.Empty;
+        if (!int.TryParse(idStr, out var id) || id <= 0)
         {
             Console.WriteLine("Неверный ID.");
             return;
         }
 
-        var (success, msg, change) = machine.BuyProduct(id);
-        Console.WriteLine(msg);
-        if (!success || change == null) return;
-        if (change.Count > 0)
+        var result = machine.BuyProduct(id);
+        Console.WriteLine(result.Message);
+        if (!result.IsSuccess || result.Change == null) return;
+        if (result.Change.Count > 0)
         {
             Console.WriteLine("Сдача:");
-            Utils.PrintCoins(change);
+            Utils.PrintCoins(result.Change);
         }
         else
         {

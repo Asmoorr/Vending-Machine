@@ -43,6 +43,16 @@ public class VendingMachine
         _collectedCents = 0;
     }
 
+    public bool IsEmptyMachineCoins() => _machineCoins.All(kv => kv.Value == 0);
+
+    public bool AddCoins(int denomination, int quantity)
+    {
+        if (!CoinDenominations.Denominations.Contains(denomination))
+            throw new ArgumentException("Неподдерживаемый номинал монеты.");
+        _machineCoins[denomination] = _machineCoins.GetValueOrDefault(denomination, 0) + quantity;
+        return true;
+    }
+
     public IEnumerable<Product> ListProducts() => _products.Select(p => p);
 
     private int GetNextProductId() => _products.Count == 0 ? 1 : _products.Max(product => product.Id) + 1;
@@ -68,24 +78,35 @@ public class VendingMachine
         return returned;
     }
 
-    public (bool success, string message, Dictionary<int, int>?change) BuyProduct(int productId)
+    public PurchaseResult BuyProduct(int productId)
     {
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(productId);
         var targetProduct = _products.FirstOrDefault(product => product.Id == productId);
         if (targetProduct == null)
-            return (false, "Товар не найден.", null);
+            return new PurchaseResult
+            {
+                IsSuccess = false,
+                Message = "Товар не найден.",
+                Change = null
+            };
         if (targetProduct.Quantity <= 0)
-            return (false, "Товар отсутствует в наличии.", null);
+            return new PurchaseResult
+            {
+                IsSuccess = false,
+                Message = "Товар отсутствует в наличии.",
+                Change = null
+            };
 
         var inserted = InsertedAmountCents;
         if (inserted < targetProduct.PriceCents)
-            return (
-                false,
-                $"Недостаточно средств. Нужно " +
-                $"{Utils.FormatMoney(targetProduct.PriceCents)}, а " +
-                $"внесено {Utils.FormatMoney(inserted)}",
-                null
-            );
+            return new PurchaseResult
+            {
+                IsSuccess = false,
+                Message = $"Недостаточно средств. Нужно " +
+                          $"{Utils.FormatMoney(targetProduct.PriceCents)}, а " +
+                          $"внесено {Utils.FormatMoney(inserted)}",
+                Change = null
+            };
 
         var changeNeeded = inserted - targetProduct.PriceCents;
 
@@ -96,7 +117,12 @@ public class VendingMachine
         var change = MakeChange(changeNeeded, pool);
         if (change == null) // Can't make change because not enough coins in the machine
         {
-            return (false, "Невозможно выдать точную сдачу. Операция отменена.", null);
+            return new PurchaseResult
+            {
+                IsSuccess = false,
+                Message = "Невозможно выдать точную сдачу. Операция отменена.",
+                Change = null
+            };
         }
 
         // Successful purchase
@@ -118,7 +144,12 @@ public class VendingMachine
         foreach (var k in CoinDenominations.Denominations)
             _insertedCoins[k] = 0;
 
-        return (true, $"Выдан товар: {targetProduct.Name}.", change);
+        return new PurchaseResult
+        {
+            IsSuccess = true,
+            Message = $"Выдан товар: {targetProduct.Name}.",
+            Change = change
+        };
     }
 
     private static Dictionary<int, int>? MakeChange(int amount, Dictionary<int, int> pool)
@@ -146,12 +177,19 @@ public class VendingMachine
         return revenue;
     }
 
-    public string AddProduct(string name, int priceCents, int quantity)
+    public int CollectInnerMoney()
+    {
+        var machineMoney = _machineCoins.Sum(kv => kv.Key * kv.Value);
+        foreach (var kv in _machineCoins)
+            _machineCoins[kv.Key] = 0;
+        return machineMoney;
+    }
+
+    public void AddProduct(string name, int priceCents, int quantity)
     {
         var productId = GetNextProductId();
         var newProduct = new Product(productId, name, priceCents, quantity);
         _products.Add(newProduct);
-        return newProduct.Name;
     }
 
 
